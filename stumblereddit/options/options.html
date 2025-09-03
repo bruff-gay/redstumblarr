@@ -1,0 +1,50 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Favorites – StumbleReddit</title>
+  <style>body{font-family:sans-serif;padding:2rem}</style>
+</head>
+<body>
+  <h1>Favorites</h1>
+  <ul id="list"></ul>
+  <button id="export">Export JSON</button>
+  <input type="file" id="import" accept=".json">
+  <script type="module">
+    const STORE_KEY = 'favorites';
+    async function refresh() {
+      const { [STORE_KEY]: fav = { list: [] } } = await chrome.storage.local.get(STORE_KEY);
+      const ul = document.getElementById('list');
+      ul.innerHTML = '';
+      fav.list.forEach(s => {
+        const li = document.createElement('li');
+        li.innerHTML = `<a href="https://www.reddit.com/r/${s}" target="_blank">r/${s}</a> <button data-s="${s}">✖</button>`;
+        li.querySelector('button').onclick = async (e) => {
+          fav.list.splice(fav.list.indexOf(e.target.dataset.s), 1);
+          await chrome.storage.local.set({ [STORE_KEY]: fav });
+          refresh();
+        };
+        ul.appendChild(li);
+      });
+    }
+    document.getElementById('export').onclick = async () => {
+      const fav = await chrome.storage.local.get(STORE_KEY);
+      const blob = new Blob([JSON.stringify(fav, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'stumble-favorites.json';
+      a.click();
+    };
+    document.getElementById('import').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const text = await file.text();
+      const json = JSON.parse(text);
+      await chrome.storage.local.set(json);
+      refresh();
+    });
+    refresh();
+  </script>
+</body>
+</html>
