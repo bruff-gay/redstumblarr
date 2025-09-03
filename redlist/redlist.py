@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Ultra-verbose, zero-redundancy crawler
-Repairs malformed JSON, uses requests for robust fetch.
+Ultra-verbose, **Selenium-free** crawler
+Repairs malformed JSON, crawls only *new* subs.
 """
 import argparse
 import itertools
