@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """
 Ultra-verbose, zero-redundancy crawler
-Repairs malformed JSON, then crawls only *new* subs.
-No Selenium, no JSON endpoints, never rebuilds the same list twice.
+Repairs malformed JSON, uses requests for robust fetch.
 """
 import argparse
 import itertools
@@ -11,11 +10,12 @@ import os
 import random
 import re
 import signal
+import sys
 import threading
 import time
-import urllib.error
-import urllib.request
 from datetime import datetime
+
+import requests
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:125.0) Gecko/20100101 Firefox/125.0"
@@ -36,23 +36,17 @@ signal.signal(signal.SIGINT, sigint)
 
 # ---------- REPAIR FILE ----------------------------------------------------
 def repair_file(outfile: str) -> None:
-    """
-    Reads the file, tries to parse each JSON object, and re-writes
-    only valid objects back to disk (one per line).
-    """
     if not os.path.isfile(outfile):
         return
-    log("repair_file -> checking integrity")
+    log("repair_file -> fixing malformed JSON")
     good = []
     try:
         with open(outfile, "rb") as f:
             raw = f.read()
-        # Split by closing brace and repair
         parts = re.findall(rb'\{.*?\}', raw)
         for p in parts:
             try:
-                obj = json.loads(p.decode("utf-8"))
-                good.append(obj)
+                good.append(json.loads(p.decode("utf-8")))
             except Exception:
                 pass
     except Exception as e:
@@ -62,38 +56,31 @@ def repair_file(outfile: str) -> None:
         for obj in good:
             f.write(json.dumps(obj, ensure_ascii=False) + "\n")
 
-# ---------- NETWORK --------------------------------------------------------
+# ---------- NETWORK ---------------------------------------------------------
 def fetch(url: str) -> str:
     delay = 5.0
     fetch.last = getattr(fetch, "last", 0.0)
     while not STOP:
         time.sleep(max(0, delay - (time.time() - fetch.last)) + random.uniform(0.1, 0.4))
         fetch.last = time.time()
-        req = urllib.request.Request(url, headers=HEADERS)
         try:
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                return resp.read().decode("utf-8", errors="ignore")
-        except urllib.error.HTTPError as e:
-            if e.code == 429:
-                sleep = int(e.headers.get("Retry-After", 60))
-                log(f"429 -> sleep {sleep}s")
-                time.sleep(sleep)
-                delay = min(delay * 2, 1800)
-                continue
-            elif e.code in {500, 502, 503, 504}:
-                log("5xx -> sleep 30s")
-                time.sleep(30)
-                continue
-            raise
+            log(f"FETCH -> {url}")
+            r = requests.get(url, headers=HEADERS, timeout=15)
+            r.raise_for_status()
+            log(f"FETCHED {len(r.text)} chars")
+            return r.text
+        except requests.exceptions.RequestException as e:
+            log(f"FETCH error {e} -> retry in 10s")
+            time.sleep(10)
     sys.exit(0)
 
-# ---------- EXTRACTION -----------------------------------------------------
+# ---------- EXTRACTION ------------------------------------------------------
 def extract_subs(html: str) -> set[str]:
     subs = {s.lower() for s in re.findall(r'/r/([A-Za-z0-9_]{3,21})(?:/|")', html)}
     log(f"extract -> {len(subs)} subs")
     return subs
 
-# ---------- LOAD / APPEND ----------------------------------------------------
+# ---------- LOAD / APPEND ---------------------------------------------------
 def load_existing(outfile: str) -> set[str]:
     if not os.path.isfile(outfile):
         return set()
@@ -124,7 +111,7 @@ def append_new(new_subs: set[str], outfile: str) -> int:
             f.write(json.dumps(stub, ensure_ascii=False) + "\n")
     return len(really_new)
 
-# ---------- STATUS PRINTER --------------------------------------------------
+# ---------- STATUS PRINTER ----------------------------------------------------
 def printer(outfile: str):
     while not STOP:
         total = sum(1 for _ in open(outfile, "r", encoding="utf-8")) if os.path.isfile(outfile) else 0
@@ -146,8 +133,7 @@ def crawl(outfile: str) -> None:
         for sub in itertools.cycle(aggregator_list):
             if len(seen) >= GOLD_TARGET or STOP:
                 break
-            url = f"https://www.reddit.com/r/{sub}/new/"
-            html = fetch(url)
+            html = fetch(f"https://www.reddit.com/r/{sub}/new/")
             fresh = extract_subs(html) - seen
             if fresh:
                 added = append_new(fresh, outfile)
