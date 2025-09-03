@@ -1,84 +1,119 @@
 #!/usr/bin/env python3
 """
-Self-growing aggregator crawler — uses JSON file itself as the next source.
+Ultra-verbose, zero-redundancy crawler
+Repairs malformed JSON, then crawls only *new* subs.
+No Selenium, no JSON endpoints, never rebuilds the same list twice.
 """
 import argparse
 import itertools
 import json
 import os
-import queue
 import random
 import re
 import signal
-import sys
 import threading
 import time
 import urllib.error
 import urllib.request
-from typing import Dict, List, Set
+from datetime import datetime
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:125.0) Gecko/20100101 Firefox/125.0"
 }
-
 GOLD_TARGET = 100_000
-JOB_QUEUE = queue.Queue()
 STOP = False
 
+# ---------- UTILS -----------------------------------------------------------
+def log(msg: str):
+    ts = datetime.now().strftime("%H:%M:%S")
+    print(f"[{ts}] {msg}")
 
+# ---------- CTRL-C ---------------------------------------------------------
 def sigint(*_):
     global STOP
     STOP = True
-
-
 signal.signal(signal.SIGINT, sigint)
 
+# ---------- REPAIR FILE ----------------------------------------------------
+def repair_file(outfile: str) -> None:
+    """
+    Reads the file, tries to parse each JSON object, and re-writes
+    only valid objects back to disk (one per line).
+    """
+    if not os.path.isfile(outfile):
+        return
+    log("repair_file -> checking integrity")
+    good = []
+    try:
+        with open(outfile, "rb") as f:
+            raw = f.read()
+        # Split by closing brace and repair
+        parts = re.findall(rb'\{.*?\}', raw)
+        for p in parts:
+            try:
+                obj = json.loads(p.decode("utf-8"))
+                good.append(obj)
+            except Exception:
+                pass
+    except Exception as e:
+        log(f"repair_file -> ERROR {e}")
+    log(f"repair_file -> {len(good)} valid objects")
+    with open(outfile, "w", encoding="utf-8") as f:
+        for obj in good:
+            f.write(json.dumps(obj, ensure_ascii=False) + "\n")
 
-# ---------- Networking ----------------------------------------------------------
-def fetch(url: str) -> Dict:
-    """Fetch raw JSON from public listing; fallback to empty dict on 429."""
-    global LAST_CALL
+# ---------- NETWORK --------------------------------------------------------
+def fetch(url: str) -> str:
     delay = 5.0
+    fetch.last = getattr(fetch, "last", 0.0)
     while not STOP:
-        gap = max(0, delay - (time.time() - LAST_CALL))
-        time.sleep(gap + random.uniform(0.1, 0.4))
-        LAST_CALL = time.time()
-
+        time.sleep(max(0, delay - (time.time() - fetch.last)) + random.uniform(0.1, 0.4))
+        fetch.last = time.time()
         req = urllib.request.Request(url, headers=HEADERS)
         try:
             with urllib.request.urlopen(req, timeout=15) as resp:
-                return json.loads(resp.read().decode("utf-8"))
+                return resp.read().decode("utf-8", errors="ignore")
         except urllib.error.HTTPError as e:
             if e.code == 429:
-                return {}
-            time.sleep(min(int(e.headers.get("Retry-After", 60)), 1800))
-            delay = min(delay * 2, 1800)
-            continue
+                sleep = int(e.headers.get("Retry-After", 60))
+                log(f"429 -> sleep {sleep}s")
+                time.sleep(sleep)
+                delay = min(delay * 2, 1800)
+                continue
+            elif e.code in {500, 502, 503, 504}:
+                log("5xx -> sleep 30s")
+                time.sleep(30)
+                continue
             raise
     sys.exit(0)
 
+# ---------- EXTRACTION -----------------------------------------------------
+def extract_subs(html: str) -> set[str]:
+    subs = {s.lower() for s in re.findall(r'/r/([A-Za-z0-9_]{3,21})(?:/|")', html)}
+    log(f"extract -> {len(subs)} subs")
+    return subs
 
-# ---------- Parse subs from HTML ------------------------------------------------
-def extract_subs_from_html(html: str) -> Set[str]:
-    pattern = re.compile(r'/r/([A-Za-z0-9_]{3,21})(?:/|")')
-    return {s.lower() for s in pattern.findall(html)}
+# ---------- LOAD / APPEND ----------------------------------------------------
+def load_existing(outfile: str) -> set[str]:
+    if not os.path.isfile(outfile):
+        return set()
+    subs = set()
+    with open(outfile, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                subs.add(json.loads(line)["name"].lower())
+            except Exception as e:
+                log(f"load_bad_line -> {e}")
+    log(f"load_existing -> {len(subs)} subs")
+    return subs
 
-
-# ---------- Atomic append (dedup) ---------------------------------------------
-def atomic_append_unique(new_subs: Set[str], outfile: str) -> int:
-    """Append only new subs; return count actually added."""
-    existing = set()
-    if os.path.isfile(outfile):
-        with open(outfile, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if line:
-                    try:
-                        data = json.loads(line)
-                        existing.add(data["name"].lower())
-                    except Exception:
-                        pass
+def append_new(new_subs: set[str], outfile: str) -> int:
+    existing = load_existing(outfile)
     really_new = new_subs - existing
+    log(f"append_new -> {len(really_new)} truly new")
     with open(outfile, "a", encoding="utf-8") as f:
         for s in really_new:
             stub = {
@@ -89,91 +124,58 @@ def atomic_append_unique(new_subs: Set[str], outfile: str) -> int:
             f.write(json.dumps(stub, ensure_ascii=False) + "\n")
     return len(really_new)
 
-
-# ---------- Status printer ------------------------------------------------------
-def status_printer(outfile: str):
+# ---------- STATUS PRINTER --------------------------------------------------
+def printer(outfile: str):
     while not STOP:
         total = sum(1 for _ in open(outfile, "r", encoding="utf-8")) if os.path.isfile(outfile) else 0
-        print(f"[TOTAL] {total:,} subs in {outfile}")
+        log(f"TOTAL {total:,} subs in {outfile}")
         time.sleep(5)
 
-
-# ---------- Load aggregator list from JSON --------------------------------------
-def load_aggregator_list(outfile: str) -> List[str]:
-    """Return the list of subreddit names already in the JSON file."""
-    if not os.path.isfile(outfile):
-        return []
-    with open(outfile, "r", encoding="utf-8") as f:
-        return [json.loads(line)["name"].lower() for line in f if line.strip()]
-
-
-# ---------- Crawl --------------------------------------------------------------
-def crawl_all(outfile: str) -> None:
-    """Deep-crawl /hot with pagination for every aggregator in JSON file."""
-    seen = set(load_aggregator_list(outfile))
-    LAST_CALL = 0.0
-
+# ---------- CRAWL -----------------------------------------------------------
+def crawl(outfile: str) -> None:
+    AGGREGATORS = [
+        "AskReddit", "funny", "pics", "todayilearned", "science", "aww",
+        "worldnews", "technology", "gaming", "movies", "books", "space",
+        "gonewild", "nsfw", "realgirls", "holdthemoan", "nsfw_gif", "porn",
+    ]
+    seen = load_existing(outfile)
+    log("Starting crawl...")
     while len(seen) < GOLD_TARGET and not STOP:
-        # Dynamically use the JSON file itself as the aggregator list
-        aggregator_list = list(load_aggregator_list(outfile)) or AGGREGATORS
-        url_iter = itertools.cycle(aggregator_list)
-
-        for sub in url_iter:
+        aggregator_list = list(load_existing(outfile)) or AGGREGATORS
+        log(f"Using {len(aggregator_list)} aggregators")
+        for sub in itertools.cycle(aggregator_list):
             if len(seen) >= GOLD_TARGET or STOP:
                 break
-            url_base = f"https://www.reddit.com/r/{sub}/hot.json?limit=100"
-            after = ""
-            while True:
-                data = fetch(url_base + f"&after={after}")
-                children = data.get("data", {}).get("children", [])
-                if not children:
-                    break
-                fresh = {
-                    child["data"]["subreddit"].lower()
-                    for child in children
-                    if child.get("data", {}).get("subreddit")
-                } - seen
-                if fresh:
-                    added = atomic_append_unique(fresh, outfile)
-                    seen |= fresh
-                after = data.get("data", {}).get("after")
-                if not after:
-                    break
+            url = f"https://www.reddit.com/r/{sub}/new/"
+            html = fetch(url)
+            fresh = extract_subs(html) - seen
+            if fresh:
+                added = append_new(fresh, outfile)
+                seen |= fresh
+                log(f"ADDED +{added}")
+            else:
+                log("No new subs")
+            time.sleep(0.5)
 
-
-# ---------- Worker --------------------------------------------------------------
-def worker():
-    while True:
-        sub = JOB_QUEUE.get()
-        stub = {
-            "name": sub,
-            "subscribers": 10_000,
-            "nsfw": sub in {"gonewild", "nsfw", "realgirls", "nsfw_gif", "porn"},
-        }
-        RESULTS[sub] = stub
-        JOB_QUEUE.task_done()
-
-
-# ---------- Main ----------------------------------------------------------------
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Self-growing aggregator crawler")
-    parser.add_argument("--gold", action="store_true", help="loop until 100k")
+# ---------- MAIN ------------------------------------------------------------
+def main():
+    parser = argparse.ArgumentParser(description="Repair + crawl")
+    parser.add_argument("--gold", action="store_true")
     parser.add_argument("--out", type=str, default="subs.json")
     args = parser.parse_args()
+    repair_file(args.out)
 
-    outfile = args.out
-    threading.Thread(target=status_printer, args=(outfile,), daemon=True).start()
-
+    threading.Thread(target=printer, args=(args.out,), daemon=True).start()
     if args.gold:
         while not STOP:
-            crawl_all(outfile)
+            crawl(args.out)
+            log("Sleeping 5 min before next cycle")
             time.sleep(300)
     else:
-        crawl_all(outfile)
+        crawl(args.out)
 
-    total = sum(1 for _ in open(outfile, "r", encoding="utf-8")) if os.path.isfile(outfile) else 0
-    print(f"[FINISHED] {total:,} total subs in {outfile}")
-
+    total = sum(1 for _ in open(args.out, "r", encoding="utf-8")) if os.path.isfile(args.out) else 0
+    log(f"FINISHED -> {total:,} total subs in {args.out}")
 
 if __name__ == "__main__":
     main()
