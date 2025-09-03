@@ -1,12 +1,14 @@
 // lib/api.js
-const DB_URL = 'https://arrgregator.bruff.xyz/all.json';
+const DB_URL = 'https://arrgregator.bruff.xyz/all.ndjson';
 
-let db;
+
+let db = null;
 
 export async function loadDatabase() {
   if (db) return db;
   const res = await fetch(DB_URL);
-  db = await res.json();
+  const text = await res.text();
+  db = text.trim().split('\n').filter(Boolean).map(JSON.parse);
   return db;
 }
 
