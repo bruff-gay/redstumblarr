@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "StumbleReddit",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "One-click random subreddit explorer (SFW + NSFW, no log-ins, no paywalls).",
 
   "permissions": [
