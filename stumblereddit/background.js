@@ -66,7 +66,7 @@ async function getRandomSubreddit(mode = 'all') {
 /**
  * Open a subreddit in a new tab.
  * Time: O(1)
- * @param sub
+ * @param sub {JSON Object} The subreddit object with at least a 'name' property
  */
 function openSubreddit(sub) {
   chrome.tabs.create({ url: `https://www.reddit.com/r/${sub.name}` });
@@ -76,7 +76,7 @@ function openSubreddit(sub) {
  * UNTESTED IMPLEMENTATION. I will get a test environment set up to try this out.
  * Open a subreddit in the current tab.
  * Time: O(1)
- * @param sub
+ * @param sub {JSON Object} The subreddit object with at least a 'name' property
  */
 function openSubredditInCurrentTab(sub) {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
