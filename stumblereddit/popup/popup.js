@@ -14,18 +14,19 @@ async function updateCounter() {
 }
 
 async function getCurrentSub() {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+  const tab  = tabs[0];
   const match = tab.url?.match(/\/r\/([^/?#]+)/);
   return match ? match[1] : null;
 }
 
 async function loadFavorites() {
-  const { [STORE_KEY]: fav = { list: [] } } = await chrome.storage.local.get(STORE_KEY);
-  return fav.list;
+  const res = await browser.storage.local.get(STORE_KEY);
+  return res?.[STORE_KEY]?.list ?? [];
 }
 
 async function saveFavorites(list) {
-  await chrome.storage.local.set({ [STORE_KEY]: { list } });
+  await browser.storage.local.set({ [STORE_KEY]: { list } });
 }
 
 async function refreshFavList() {
@@ -49,7 +50,7 @@ window.addEventListener('DOMContentLoaded', () => {
   // random
   document.getElementById('stumble').addEventListener('click', () => {
     const mode = document.getElementById('mode').value;
-    chrome.runtime.sendMessage({ action: 'openRandom', mode });
+    browser.runtime.sendMessage({ action: 'openRandom', mode });
   });
 
   // add/remove favorite for current tab
@@ -72,4 +73,3 @@ window.addEventListener('DOMContentLoaded', () => {
     ul.style.display = ul.style.display === 'none' ? 'block' : 'none';
   });
 });
-
