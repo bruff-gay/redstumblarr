@@ -1,20 +1,16 @@
 {
   "manifest_version": 3,
-  "name": "StumbleReddit – Offline",
-  "version": "2.2.0",
-  "description": "Open a random subreddit from a local database.  Works completely offline.",
+  "name": "StumbleReddit",
+  "version": "2.0.1",
+  "description": "Open a random subreddit from a local database.",
   "permissions": ["storage", "tabs", "contextMenus"],
-  "host_permissions": ["https://arrgregator.bruff.xyz/all.ndjson"],
+  "host_permissions": ["https://raw.githubusercontent.com/bruff-gay/redlistjson/refs/heads/main/all.ndjson"],
   "background": {
-    "scripts": ["background.js"],
-    "type": "module"
+    "scripts": ["background.js"]
   },
   "action": {
     "default_title": "StumbleReddit",
     "default_popup": "popup/popup.html"
-  },
-  "options_ui": {
-    "page": "popup/popup.html",
-    "open_in_tab": false
   }
 }
+
