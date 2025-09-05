@@ -1,32 +1,41 @@
 {
-  "manifest_version": 3,
+  "manifest_version": 2,
   "name": "StumbleReddit",
   "version": "1.0.0",
   "description": "One-click random subreddit explorer (SFW + NSFW, no log-ins, no paywalls).",
-  "permissions": ["storage", "activeTab", "tabs", "contextMenus"],
-  "host_permissions": ["https://www.reddit.com/*", "https://old.reddit.com/*"],
+
+  "permissions": [
+    "storage",
+    "contextMenus",
+    "https://www.reddit.com/*",
+    "https://old.reddit.com/*"
+  ],
+
   "background": {
-  "scripts": ["background.js"],
-  "type": "module"},
-  
+    "scripts": ["background.js"],
+    "persistent": false
+  },
+
   "content_scripts": [
     {
-      "matches": ["https://www.reddit.com/*", "https://old.reddit.com/*"],
+      "matches": [
+        "https://www.reddit.com/*",
+        "https://old.reddit.com/*"
+      ],
       "css": ["overlay.css"],
       "js": ["overlay.js"],
       "run_at": "document_end"
     }
   ],
-  "action": {
+
+  "browser_action": {
     "default_title": "StumbleReddit",
     "default_popup": "popup/popup.html",
     "default_icon": {
-      "16": "icons/16.png",
-      "32": "icons/32.png",
-      "48": "icons/48.png",
-      "128": "icons/128.png"
+      "48": "icons/48.png"
     }
   },
+
   "commands": {
     "random-subreddit": {
       "suggested_key": { "default": "Ctrl+Shift+R" },
@@ -45,10 +54,9 @@
       "description": "Toggle overlay on current page"
     }
   },
+
   "icons": {
-    "16": "icons/16.png",
-    "32": "icons/32.png",
-    "48": "icons/48.png",
-    "128": "icons/128.png"
+    "48": "icons/48.png"
   }
 }
+

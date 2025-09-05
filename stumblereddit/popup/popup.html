@@ -2,18 +2,33 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <style>body{font-family:sans-serif;padding:1rem}select{margin-bottom:.5rem;width:100%}</style>
+  <style>
+    body{font-family:sans-serif;padding:.75rem;width:200px}
+    h1{margin:0 0 .5rem 0;font-size:1.2rem}
+    select{width:100%;margin-bottom:.5rem}
+    .buttons{display:flex;gap:.25rem}
+    .buttons button{flex:1}
+  </style>
 </head>
 <body>
-  <h1>StumbleReddit</h1>
+  <h1>StumbleReddit <span id="count">…</span></h1>
+
   <select id="mode">
     <option value="all">All</option>
     <option value="sfw">SFW only</option>
     <option value="nsfw">NSFW only</option>
     <option value="creators">Creators only</option>
   </select>
-  <button id="stumble">🎲 Random</button>
-  <button id="manage">⭐ Favorites</button>
-  <script type="module" src="popup.js"></script>
+
+  <div class="buttons">
+    <button id="stumble">🎲 Random</button>
+    <button id="favToggle">⭐ Add</button>
+    <button id="showFavs">❤️</button>
+  </div>
+
+  <ul id="favList" style="display:none;margin:.5rem 0 0 0;padding-left:1rem"></ul>
+
+  <script src="popup.js"></script>
 </body>
 </html>
+
