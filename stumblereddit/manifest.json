@@ -1,62 +1,20 @@
 {
-  "manifest_version": 2,
-  "name": "StumbleReddit",
-  "version": "2.1.0",
-  "description": "One-click random subreddit explorer (SFW + NSFW, no log-ins, no paywalls).",
-
-  "permissions": [
-    "storage",
-    "contextMenus",
-    "https://www.reddit.com/*",
-    "https://old.reddit.com/*"
-  ],
-
+  "manifest_version": 3,
+  "name": "StumbleReddit – Offline",
+  "version": "2.0.0",
+  "description": "Open a random subreddit from a local database.  Works completely offline.",
+  "permissions": ["storage", "tabs", "contextMenus"],
+  "host_permissions": ["https://arrgregator.bruff.xyz/all.ndjson"],
   "background": {
     "scripts": ["background.js"],
-    "persistent": false
+    "type": "module"
   },
-
-  "content_scripts": [
-    {
-      "matches": [
-        "https://www.reddit.com/*",
-        "https://old.reddit.com/*"
-      ],
-      "css": ["overlay.css"],
-      "js": ["overlay.js"],
-      "run_at": "document_end"
-    }
-  ],
-
-  "browser_action": {
+  "action": {
     "default_title": "StumbleReddit",
-    "default_popup": "popup/popup.html",
-    "default_icon": {
-      "48": "icons/48.png"
-    }
+    "default_popup": "popup/popup.html"
   },
-
-  "commands": {
-    "random-subreddit": {
-      "suggested_key": { "default": "Ctrl+Shift+R" },
-      "description": "Jump to a random subreddit"
-    },
-    "toggle-favorite": {
-      "suggested_key": { "default": "Ctrl+Shift+F" },
-      "description": "Toggle favorite for current subreddit"
-    },
-    "open-favorites": {
-      "suggested_key": { "default": "Ctrl+Shift+B" },
-      "description": "Open favorites manager"
-    },
-    "toggle-overlay": {
-      "suggested_key": { "default": "Ctrl+Shift+O" },
-      "description": "Toggle overlay on current page"
-    }
-  },
-
-  "icons": {
-    "48": "icons/48.png"
+  "options_ui": {
+    "page": "popup/popup.html",
+    "open_in_tab": false
   }
 }
-
