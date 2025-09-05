@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "StumbleReddit",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "Open a random subreddit from a local database.",
   "permissions": ["storage", "tabs", "contextMenus"],
   "host_permissions": ["https://raw.githubusercontent.com/bruff-gay/redlistjson/refs/heads/main/all.ndjson"],
