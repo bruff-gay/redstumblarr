@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "StumbleReddit – Offline",
-  "version": "2.0.0",
+  "version": "2.2.0",
   "description": "Open a random subreddit from a local database.  Works completely offline.",
   "permissions": ["storage", "tabs", "contextMenus"],
   "host_permissions": ["https://arrgregator.bruff.xyz/all.ndjson"],
