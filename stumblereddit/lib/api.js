@@ -1,5 +1,5 @@
 // lib/api.js
-const DB_URL = 'https://github.com/bruff-gay/redlistjson/blob/518abcd8557c902f9883912efaeafb333f6b830c/all.ndjson';
+const DB_URL = 'https://raw.githubusercontent.com/bruff-gay/redlistjson/refs/heads/main/all.ndjson';
 
 
 let db = null;
