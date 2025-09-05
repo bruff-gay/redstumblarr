@@ -21,7 +21,7 @@ async function loadDatabase() {
 /**
  * Get a random subreddit from the database
  * Time: O(n) due to filtering
- * @param mode
+ * @param mode {string} The mode to filter subreddits ('all', 'sfw', 'nsfw', 'creators')
  * @returns {Promise<Object>} A random subreddit object
  */
 async function getRandomSubreddit(mode = 'all') {
