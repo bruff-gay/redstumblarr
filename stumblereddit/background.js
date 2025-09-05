@@ -1,5 +1,5 @@
 // background.js
-const DB_URL = 'https://arrgregator.bruff.xyz/all.ndjson';
+const DB_URL = 'https://raw.githubusercontent.com/bruff-gay/redlistjson/refs/heads/main/all.ndjson';
 
 let db;
 async function loadDatabase() {
