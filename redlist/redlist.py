@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Ultra-verbose, zero-redundancy crawler
-Writes every new subreddit immediately so you can tail -f subs.json
+Writes every new subreddit immediately so you can tail -f subs.ndjson
 """
 import argparse
 import itertools
@@ -195,7 +195,7 @@ def crawl(outfile: str) -> None:
 def main():
     parser = argparse.ArgumentParser(description="Ultra-verbose live crawler")
     parser.add_argument("--gold", action="store_true", help="loop forever")
-    parser.add_argument("--out", type=str, default="subs.json", help="output file")
+    parser.add_argument("--out", type=str, default="subs.ndjson", help="output file")
     args = parser.parse_args()
 
     # no repair_file call – start crawling immediately
