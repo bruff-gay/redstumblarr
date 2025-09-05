@@ -1,150 +1,241 @@
 #!/usr/bin/env python3
 """
-Zero-JSON live crawler
-* never calls /about.json
-* scrapes NSFW flag + subscriber count from public HTML
-* writes one NDJSON line per subreddit, flush + fsync on every new record
+Fast NSFW crawler – restart on 10×429, always check DEFAULT_AGGREGATORS first,
+accurate NSFW flag via /about.json
 """
-import argparse, os, re, json, time, random, signal, sys, threading, itertools, urllib.request, urllib.error
+import argparse
+import concurrent.futures
+import itertools
+import json
+import os
+import random
+import re
+import signal
+import sys
+import threading
+import time
 from datetime import datetime
 
-HEADERS = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:125.0) Gecko/20100101 Firefox/125.0"}
+import requests
+
+HEADERS_LIST = [
+    {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:125.0) Gecko/20100101 Firefox/125.0"},
+    {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36"},
+    {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 13.5; rv:125.0) Gecko/20100101 Firefox/125.0"},
+]
+
 GOLD_TARGET = 100_000
+MAX_WORKERS = 30
+BATCH_SIZE = 1000
+FLUSH_EVERY = 2
+MAX_BACKOFF = 600
+RESTART_429_COUNT = 10
+
 STOP = False
+
+# ---------- DEFAULT AGGREGATORS (always first)
+DEFAULT_AGGREGATORS = [
+    "AskReddit", "funny", "pics", "todayilearned", "science", "aww",
+    "worldnews", "technology", "gaming", "movies", "books", "space",
+    "gonewild", "nsfw", "realgirls", "holdthemoan", "nsfw_gif", "porn",
+    "NSFW_GIF", "Amateur", "NSFW_Japan", "GWCouples"
+]
+
+class Counters:
+    seen = set()
+    http_errors = {}
+    appended = 0
+    start_time = None
+    buffer = []
+    last_flush = 0
+    current_page = ""
+    total_429s = 0
 
 # ---------- UTILS -----------------------------------------------------------
 def log(msg, *a, **kw):
-    print(f"[{datetime.now():%H:%M:%S}] {msg}", *a, **kw)
+    print(f"[{datetime.now():%H:%M:%S}] {msg}", *a, **kw, file=sys.stderr)
+
+def fmt_seconds(s):
+    m, s = divmod(int(s), 60)
+    h, m = divmod(m, 60)
+    return f"{h:02d}:{m:02d}:{s:02d}"
+
 def sigint(*_):
-    global STOP; log("SIGINT caught — shutting down gracefully..."); STOP = True
+    global STOP
+    log("SIGINT caught — shutting down...")
+    STOP = True
 signal.signal(signal.SIGINT, sigint)
 
-# ---------- NETWORK ---------------------------------------------------------
-def fetch(url: str) -> str:
-    delay = 5.0
-    while not STOP:
-        time.sleep(max(0, delay - (time.time() - getattr(fetch, "last", 0))) + random.uniform(0.1, 0.4))
-        fetch.last = time.time()
-        req = urllib.request.Request(url, headers=HEADERS)
-        try:
-            with urllib.request.urlopen(req, timeout=15) as r:
-                return r.read().decode("utf-8", errors="ignore")
-        except urllib.error.HTTPError as e:
-            if e.code == 429:
-                time.sleep(int(e.headers.get("Retry-After", 30)))
-                continue
-            if 500 <= e.code < 600:
-                time.sleep(30)
-                continue
-            raise
-    sys.exit(0)
+# ---------- SESSION ----------------------------------------------------------
+session = requests.Session()
 
-# ---------- EXTRACTION -------------------------------------------------------
+def _backoff(attempt: int) -> float:
+    return min((2 ** attempt) + random.uniform(0, 1), MAX_BACKOFF)
+
+def fetch(url: str) -> str | None:
+    headers = random.choice(HEADERS_LIST)
+    try:
+        r = session.get(url, headers=headers, timeout=15)
+        r.raise_for_status()
+        return r.text
+    except requests.HTTPError as e:
+        Counters.http_errors[e.response.status_code] = Counters.http_errors.get(e.response.status_code, 0) + 1
+        if e.response.status_code == 429:
+            Counters.total_429s += 1
+        return None
+
+def fetch_json(url: str) -> dict | None:
+    headers = random.choice(HEADERS_LIST)
+    try:
+        r = session.get(url, headers=headers, timeout=15)
+        r.raise_for_status()
+        return r.json()
+    except requests.HTTPError as e:
+        Counters.http_errors[e.response.status_code] = Counters.http_errors.get(e.response.status_code, 0) + 1
+        if e.response.status_code == 429:
+            Counters.total_429s += 1
+        return None
+
+# ---------- EXTRACTION ------------------------------------------------------
 def extract_subs(html: str) -> set[str]:
     return {s.lower() for s in re.findall(r'/r/([A-Za-z0-9_]{3,21})(?:/|")', html)}
 
-def extract_meta(html: str) -> tuple[bool, int] | None:
-    """
-    Scrape NSFW flag and subscriber count from a normal subreddit front page.
-    Returns (nsfw, subscribers) or None on parse failure.
-    """
-    # 1. NSFW
-    nsfw = bool(re.search(r'"over18":\s*true|nsfw.*?community', html, flags=re.I))
-    # 2. Subscribers
-    m = re.search(r'"subscribers":\s*(\d+)', html)
-    if not m:
-        m = re.search(r'(\d[\d,]*)\s*(?:members?|subscribers?)', html, flags=re.I)
-    if not m:
+def extract_meta(sub: str) -> tuple[bool, int] | None:
+    url = f"https://www.reddit.com/r/{sub}/about.json"
+    data = fetch_json(url)
+    if not data:
         return None
-    subs = int(m.group(1).replace(",", ""))
-    return nsfw, subs
+    try:
+        return bool(data["data"]["over18"]), int(data["data"]["subscribers"])
+    except (KeyError, ValueError):
+        return None
 
-# ---------- LOAD + SAVE ------------------------------------------------------
-def load_names(outfile: str) -> set[str]:
+# ---------- FILE I/O --------------------------------------------------------
+def flush(outfile: str):
+    if not Counters.buffer:
+        return
+    with open(outfile, "a", encoding="utf-8", buffering=1) as f:
+        f.write("".join(Counters.buffer))
+    Counters.buffer.clear()
+
+def append(rec: dict, outfile: str):
+    Counters.buffer.append(json.dumps(rec, ensure_ascii=False) + "\n")
+    Counters.appended += 1
+    if len(Counters.buffer) >= BATCH_SIZE or time.time() - Counters.last_flush >= FLUSH_EVERY:
+        flush(outfile)
+        Counters.last_flush = time.time()
+
+# ---------- LOAD ------------------------------------------------------------
+def load_seen(outfile: str) -> set[str]:
     if not os.path.isfile(outfile):
         return set()
-    names = set()
+    seen = set()
     with open(outfile, encoding="utf-8") as f:
         for ln in f:
             try:
-                names.add(json.loads(ln)["name"].lower())
+                seen.add(json.loads(ln)["name"].lower())
             except Exception:
                 pass
-    return names
-
-def append_new(new: set[str], outfile: str) -> int:
-    existing = load_names(outfile)
-    todo = new - existing
-    log(f"[append] {len(todo)} candidates after fast filter")
-    written = 0
-    with open(outfile, "a", encoding="utf-8") as f:
-        for sub in sorted(todo):
-            if sub in load_names(outfile):   # race-safe double check
-                continue
-            url = f"https://www.reddit.com/r/{sub}/"
-            html = fetch(url)
-            meta = extract_meta(html)
-            if meta is None:
-                continue
-            nsfw, subs = meta
-            line = json.dumps({"name": sub, "subscribers": subs, "nsfw": nsfw}, ensure_ascii=False)
-            f.write(line + "\n")
-            f.flush(); os.fsync(f.fileno())
-            written += 1
-            log(f"[append] flushed /r/{sub}  NSFW={nsfw}  subs={subs:,}")
-    return written
+    return seen
 
 # ---------- STATUS ----------------------------------------------------------
 def printer(outfile: str):
     while not STOP:
-        total = sum(1 for _ in open(outfile, encoding="utf-8")) if os.path.isfile(outfile) else 0
-        log(f"[status] {total:,} subreddits in {outfile}")
-        time.sleep(5)
-
-# ---------- CRAWL -----------------------------------------------------------
-AGGREGATORS = [
-    "AskReddit", "funny", "pics", "todayilearned", "science", "aww",
-    "worldnews", "technology", "gaming", "movies", "books", "space",
-    "gonewild", "nsfw", "realgirls", "holdthemoan", "nsfw_gif", "porn",
-]
-
-def crawl(outfile: str):
-    seen = load_names(outfile)
-    agg_cycle = itertools.cycle(load_names(outfile) or AGGREGATORS)
-    fetch_count = 0
-    while len(seen) < GOLD_TARGET and not STOP:
-        if fetch_count % 4 == 3:
-            url = "https://www.reddit.com/r/all/new/"
+        total = len(Counters.seen)
+        pct = total / GOLD_TARGET
+        filled = int(pct * 40)
+        bar = "█" * filled + "░" * (40 - filled)
+        errs = ",".join(f"{c}:{n}" for c, n in sorted(Counters.http_errors.items()))
+        errs = errs or "0"
+        eta = ""
+        if Counters.start_time:
+            elapsed = time.time() - Counters.start_time
+            if total:
+                eta = fmt_seconds(elapsed / total * (GOLD_TARGET - total))
         else:
-            sub = next(agg_cycle)
-            url = f"https://www.reddit.com/r/{sub}/new/"
-        html = fetch(url)
-        fresh = extract_subs(html) - seen
-        if fresh:
-            added = append_new(fresh, outfile)
-            seen |= fresh
-            log(f"[crawl] +{added} new subs  (total {len(seen)})")
-        fetch_count += 1
-        time.sleep(0.5)
+            eta = "--:--:--"
+        print(
+            f"\rTotal={total:,}  429s={Counters.total_429s}  Errors={errs}  Appended={Counters.appended}  "
+            f"Page={Counters.current_page}  "
+            f"[{bar}]  {total}/{GOLD_TARGET}  {pct*100:5.1f}%  ETA {eta} ",
+            end="", flush=True
+        )
+        time.sleep(2)
 
-# ---------- MAIN ------------------------------------------------------------
+# ---------- CRAWL ----------------------------------------------------------
+def crawl(outfile: str):
+    Counters.seen = load_seen(outfile)
+    Counters.start_time = time.time()
+    Counters.total_429s = 0
+
+    # always process default aggregators first
+    cycle_list = list(DEFAULT_AGGREGATORS) + list(Counters.seen)
+    agg_cycle = itertools.cycle(cycle_list)
+    fetch_count = 0
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
+        while len(Counters.seen) < GOLD_TARGET and not STOP:
+            if Counters.total_429s >= RESTART_429_COUNT:
+                log(f"Hit {RESTART_429_COUNT} 429s – restarting")
+                os.execv(sys.executable, [sys.executable] + sys.argv)
+
+            if fetch_count % 4 == 3:
+                url = "https://www.reddit.com/r/all/new"
+            else:
+                url = f"https://www.reddit.com/r/{next(agg_cycle)}/new"
+            Counters.current_page = url
+
+            html = fetch(url)
+            if html is None:
+                fetch_count += 1
+                time.sleep(_backoff(fetch_count % 10))
+                continue
+
+            fresh = extract_subs(html) - Counters.seen
+            if not fresh:
+                fetch_count += 1
+                time.sleep(0.2)
+                continue
+
+            fresh_list = list(fresh)
+            futures = {pool.submit(extract_meta, s): s for s in fresh_list}
+
+            for fut in concurrent.futures.as_completed(futures):
+                if STOP:
+                    break
+                res = fut.result()
+                if res is None:
+                    continue
+                nsfw, subs = res
+                sub = futures[fut]
+                rec = {"name": sub, "subscribers": subs, "nsfw": nsfw}
+                Counters.seen.add(sub)
+                append(rec, outfile)
+
+            flush(outfile)
+            fetch_count += 1
+            time.sleep(0.2)
+    flush(outfile)
+
+# ---------- MAIN ----------------------------------------------------------
 def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--gold", action="store_true")
-    ap.add_argument("--out", default="subs.ndjson")
+    ap = argparse.ArgumentParser(description="Fast NSFW crawler – restart on 429")
+    ap.add_argument("--gold", action="store_true", help="loop forever")
+    ap.add_argument("--out", type=str, default="all.ndjson", help="output file")
     args = ap.parse_args()
 
     threading.Thread(target=printer, args=(args.out,), daemon=True).start()
     if args.gold:
         while not STOP:
             crawl(args.out)
-            log("[main] sleeping 5 min before next cycle")
-            time.sleep(300)
+            log("sleeping 2 min before next cycle")
+            time.sleep(120)
     else:
         crawl(args.out)
 
-    total = sum(1 for _ in open(args.out, encoding="utf-8")) if os.path.isfile(args.out) else 0
-    log(f"[main] finished with {total:,} subreddits in {args.out}")
+    total = len(Counters.seen)
+    log(f"\n[main] finished with {total:,} subreddits in {args.out}")
 
 if __name__ == "__main__":
+    # pip install requests
     main()
