@@ -1,4 +1,4 @@
-const DB_URL = 'https://arrgregator.bruff.xyz/all.ndjson';
+const DB_URL = 'https://github.com/bruff-gay/redlistjson/blob/518abcd8557c902f9883912efaeafb333f6b830c/all.ndjson';
 const STORE_KEY = 'favorites';
 
 // ---------- helpers ----------
