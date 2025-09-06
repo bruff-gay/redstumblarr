@@ -1,18 +1,22 @@
 {
-  "manifest_version": 2,
-  "name": "StumbleReddit",
-  "version": "2.0.2",
-  "description": "Open a random subreddit from a local database.",
+  "manifest_version": 3,
+  "name": "StumbleReddit – Offline",
+  "version": "2.0.4",
+  "description": "Open a random subreddit from a local database. Works completely offline.",
   "permissions": ["storage", "tabs", "contextMenus"],
-  "host_permissions": [ "https://raw.githubusercontent.com/bruff-gay/redlistjson/refs/heads/main/all.ndjson",
-  "https://old.reddit.com/*",
-  "https://www.reddit.com/*"],
+  "host_permissions": [
+    "https://raw.githubusercontent.com/bruff-gay/redlistjson/refs/heads/main/all.ndjson",
+    "https://old.reddit.com/*",
+    "https://www.reddit.com/*"
+  ],
   "background": {
     "scripts": ["background.js"]
   },
   "action": {
     "default_title": "StumbleReddit",
-    "default_popup": "popup/popup.html"
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "48": "48.png"
+    }
   }
 }
-
