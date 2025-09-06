@@ -4,7 +4,9 @@
   "version": "2.0.2",
   "description": "Open a random subreddit from a local database.",
   "permissions": ["storage", "tabs", "contextMenus"],
-  "host_permissions": ["https://raw.githubusercontent.com/bruff-gay/redlistjson/refs/heads/main/all.ndjson"],
+  "host_permissions": [ "https://raw.githubusercontent.com/bruff-gay/redlistjson/refs/heads/main/all.ndjson",
+  "https://old.reddit.com/*",
+  "https://www.reddit.com/*"],
   "background": {
     "scripts": ["background.js"]
   },
