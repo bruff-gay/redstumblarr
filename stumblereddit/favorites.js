@@ -6,11 +6,14 @@ async function load() {
   ul.innerHTML = '';
   fav.list.forEach(name => {
     const li = document.createElement('li');
-    li.innerHTML = `<a href="https://reddit.com/r/${name}" target="_blank">r/${name}</a>`;
-    ul.appendChild(li);
+    const a = document.createElement('a');
+    a.href = `https://reddit.com/r/${name}`;
+    a.textContent = `r/${name}`;
+    a.target = '_blank';
+    li.appendChild(a);
+    ul.appendChild(li);          // <- add the line to the DOM
   });
 }
 
 window.addEventListener('DOMContentLoaded', load);
 chrome.storage.onChanged.addListener(load);
-

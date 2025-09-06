@@ -35,7 +35,11 @@ async function refreshFavList() {
   ul.innerHTML = '';
   favs.forEach(name => {
     const li = document.createElement('li');
-    li.innerHTML = `<a href="https://reddit.com/r/${name}" target="_blank">r/${name}</a>`;
+    const a = document.createElement('a');
+    a.href = `https://reddit.com/r/${name}`;
+    a.textContent = `r/${name}`;
+    a.target = '_blank';
+    li.appendChild(a);
     ul.appendChild(li);
   });
   ul.style.display = favs.length ? 'block' : 'none';

@@ -1,6 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "StumbleReddit – Offline",
+  "id": "stumblereddit@bruff.gay",
+  "name": "RedStumblarr",
   "version": "2.0.4",
   "description": "Open a random subreddit from a local database. Works completely offline.",
   "permissions": ["storage", "tabs", "contextMenus"],
@@ -15,8 +16,12 @@
   "action": {
     "default_title": "StumbleReddit",
     "default_popup": "popup/popup.html",
-    "default_icon": {
-      "48": "48.png"
+    "default_icon": { "48": "48.png" }
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "stumblereddit@bruff.gay",
+      "data_collection_permissions": []
     }
   }
 }
