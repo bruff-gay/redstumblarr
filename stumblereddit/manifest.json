@@ -21,7 +21,7 @@
   "browser_specific_settings": {
     "gecko": {
       "id": "stumblereddit@bruff.gay",
-      "data_collection_permissions": []
+      "data_collection_permissions": {}
     }
   }
 }
