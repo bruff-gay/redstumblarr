@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "id": "stumblereddit@bruff.gay",
+  "id": "2b4d96d3-ca4b-4eb2-b6e8-9c5d9f15ef17",
   "name": "RedStumblarr",
   "version": "2.0.4",
   "description": "Open a random subreddit from a local database. Works completely offline.",
@@ -19,9 +19,8 @@
     "default_icon": { "48": "/icons/48.png" }
   },
   "browser_specific_settings": {
-    "gecko": {
-      "id": "stumblereddit@bruff.gay"
-    
-    }
+  "gecko": {
+    "id": "{2b4d96d3-ca4b-4eb2-b6e8-9c5d9f15ef17}"
   }
+}
 }
