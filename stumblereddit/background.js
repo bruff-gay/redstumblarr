@@ -33,7 +33,7 @@ async function fetchBundledSnapshot() {
   await browser.storage.local.set({ [STORAGE_KEY]: { data, etag: '' } });
   return data;
 }
-/* ---------- 2.  optional daily update (disabled by default) ----------*/
+/* ---------- 2. daily update ----------*/
 async function maybeUpdateDB() {
   const { [STORAGE_KEY]: store } = await browser.storage.local.get(STORAGE_KEY);
   const headers = store?.etag ? { 'If-None-Match': store.etag } : {};
@@ -42,8 +42,8 @@ async function maybeUpdateDB() {
     if (res.status === 200) await fetchAndCacheDB();
   } catch {}
 }
-// setInterval(maybeUpdateDB, 24*60*60*1000); // check once per day
-/*------------------------------------------------------------------------*/
+// setInterval(24*60*60*1000); // check once per day
+
 /* ---------- 2.  messaging ---------- */
 browser.runtime.onMessage.addListener(async (msg) => {
   if (msg.action === 'openRandom') {
