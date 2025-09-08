@@ -1,6 +1,6 @@
 RedStumblarr
 
-Offline, privacy-first "stumbler" for R*ddit.
+Offline, privacy-first "stumbler" for Reddit.
 What it is
 
 A tiny Firefox WebExtension that opens a random subreddit

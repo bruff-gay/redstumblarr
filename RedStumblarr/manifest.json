@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "id": "2b4d96d3-ca4b-4eb2-b6e8-9c5d9f15ef17",
   "name": "RedStumblarr",
-  "version": "2.0.5",
+  "version": "0.0.5",
   "description": "A FOSS Extension for discovering new subreddits",
   "permissions": ["storage", "tabs", "contextMenus"],
   "host_permissions": [
