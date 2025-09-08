@@ -51,6 +51,22 @@ browser.runtime.onMessage.addListener(async (msg) => {
     const list = filterDB(db, msg.mode);
     if (!list.length) return;
     const pick = list[Math.floor(Math.random() * list.length)];
+    
+    // Check if we should reuse current tab
+    const { reuseTab } = await browser.storage.sync.get('reuseTab');
+    if (reuseTab === true) {
+      // Get current tab
+      const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+      
+      // Check if current tab is on Reddit
+      if (tab && tab.url && tab.url.includes('reddit.com')) {
+        // Reuse current tab
+        await browser.tabs.update(tab.id, { url: `https://www.reddit.com/r/${pick.name}` });
+        return;
+      }
+    }
+    
+    // Create new tab if reuse not applicable
     browser.tabs.create({ url: `https://www.reddit.com/r/${pick.name}` });
   }
 });

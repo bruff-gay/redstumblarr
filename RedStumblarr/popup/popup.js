@@ -70,7 +70,17 @@ window.addEventListener('DOMContentLoaded', () => {
     await saveFavorites(favs);
     await refreshFavList();
   });
-
+   //why do you need so many open tabs? use one tab
+  document.addEventListener('DOMContentLoaded', async () => {
+    const useCurrentTabCheckbox = document.getElementById('useCurrentTab');
+    // Load saved preference
+    const { reuseTab = false } = await browser.storage.sync.get('reuseTab');
+    useCurrentTabCheckbox.checked = reuseTab;
+    // Save preference when changed
+    useCurrentTabCheckbox.addEventListener('change', async (e) => {
+      await browser.storage.sync.set({ reuseTab: e.target.checked });
+    });
+  });
   // show / hide favorites list
   document.getElementById('showFavs').addEventListener('click', () => {
     const ul = document.getElementById('favList');
