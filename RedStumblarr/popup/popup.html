@@ -1,35 +1,53 @@
-<!doctype html>
+<!doctype html> 
 <html>
 <head>
-  <meta charset="utf-8">
-  <style>
-    body{font-family:sans-serif;padding:.75rem;width:200px}
-    h1{margin:0 0 .5rem 0;font-size:1.2rem}
-    select{width:100%;margin-bottom:.5rem}
-    .buttons{display:flex;gap:.25rem}
-    .buttons button{flex:1}
-  </style>
+<meta charset="utf-8">
+<style>
+body{font-family:sans-serif;padding:.75rem;width:200px}
+h1{margin:0 0 .5rem 0;font-size:1.2rem}
+select{width:100%;margin-bottom:.5rem}
+.buttons{display:flex;gap:.25rem}
+.buttons button{flex:1}
+  
+
+/* Dark mode styles */
+.dark-mode {
+background-color: #1a1a1a;
+color: #e0e0e0;
+} 
+
+.dark-mode button,
+.dark-mode select,
+.dark-mode input {
+background-color: #2d2d2d;
+color: #e0e0e0;
+border-color: #404040;
+}
+</style> 
 </head>
 <body>
-  <h1>RedStumblarr <span id="count">…</span></h1>
-
-  <select id="mode">
-    <option value="all">All</option>
-    <option value="sfw">SFW only</option>
-    <option value="nsfw">NSFW only</option>
-
-  </select>
+<h1>RedStumblarr <span id="count">…</span></h1>
+<select id="mode">
+<option value="all">All</option>
+<option value="sfw">SFW only</option>
+<option value="nsfw">NSFW only</option>
+</select>
+  
 <input type="checkbox" id="useCurrentTab">
 <label for="useCurrentTab">Use current tab (if on Reddit)</label>
-  <div class="buttons">
-    <button id="stumble">🎲 Random</button>
-    <button id="favToggle">⭐ Add</button>
-    <button id="showFavs">❤️</button>
-  </div>
-
-  <ul id="favList" style="display:none;margin:.5rem 0 0 0;padding-left:1rem"></ul>
-
-  <script src="popup.js"></script>
+  
+<div>
+<label>
+<input type="checkbox" id="darkModeToggle"> Dark Mode
+</label>
+</div>
+  
+<div class="buttons">
+<button id="stumble">🎲 Random</button>
+<button id="favToggle">⭐ Add</button>
+<button id="showFavs">❤️</button>
+</div>
+<ul id="favList" style="display:none;margin:.5rem 0 0 0;padding-left:1rem"></ul>
+<script src="popup.js"></script>
 </body>
 </html>
-
