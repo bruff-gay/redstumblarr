@@ -48,7 +48,7 @@ async function refreshFavList() {
 // ---------- init ----------
 window.addEventListener('DOMContentLoaded', () => {
   updateCounter();
-  setInterval(updateCounter, 5000);
+  setInterval(updateCounter, 21600000);
   refreshFavList();
 
   // random
