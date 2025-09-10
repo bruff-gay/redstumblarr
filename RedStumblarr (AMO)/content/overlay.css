@@ -1,0 +1,16 @@
+#stumble-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+.panel {
+  background: #fff;
+  border-radius: 8px;
+  padding: 1rem;
+  display: flex;
+  gap: .5rem;
+}

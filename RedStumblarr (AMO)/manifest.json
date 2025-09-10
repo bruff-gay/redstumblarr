@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "id": "2b4d96d3-ca4b-4eb2-b6e8-9c5d9f15ef17",
+  "name": "RedStumblarr",
+  "version": "0.0.9",
+  "description": "A FOSS Extension for discovering new subreddits",
+  "permissions": ["storage", "tabs", "contextMenus"],
+  "host_permissions": [
+    "https://raw.githubusercontent.com/bruff-gay/redlistjson/refs/heads/main/all.ndjson",
+    "https://old.reddit.com/*",
+    "https://www.reddit.com/*"
+  ],
+  "background": {
+    "scripts": ["background.js"]
+  },
+  "action": {
+    "default_title": "RedStumblarr",
+    "default_popup": "popup/popup.html",
+    "default_icon": { "48": "/icons/48.png" }
+  },
+  "browser_specific_settings": {
+  "gecko": {
+    "id": "{2b4d96d3-ca4b-4eb2-b6e8-9c5d9f15ef17}"
+  }
+}
+}
