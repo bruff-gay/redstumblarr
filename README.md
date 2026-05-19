@@ -11,7 +11,7 @@ A tiny Firefox WebExtension that opens a random subreddit
 Features
 
     One-click “Random” button on the toolbar
-    Works completely offline once the list is cached
+    Works completely "offline" once the list is cached
     Add favorites with a second click
     Opens links in new tabs; respects old.reddit.com preference
     Zero permissions beyond storage and the Reddit hosts
@@ -19,7 +19,7 @@ Features
 
 Install (production)
 
-    Grab the latest signed .xpi from Releases
+    Grab the latest signed .xpi from Releases or https://addons.mozilla.org/en-US/firefox/addon/redstumblarr/
     Firefox → Add-ons Manager → Install Add-on From File
     Icon appears in the toolbar—start stumbling.
 
@@ -29,7 +29,6 @@ Bash
 
 git clone https://github.com/bruff-gay/redstumblarr.git
 cd redstumblarr
-# no build step; pure JS
 zip -r pubrelease.zip . -x '*.git*' README.md
 
 
