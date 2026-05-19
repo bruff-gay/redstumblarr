@@ -4,7 +4,7 @@ Offline, privacy-first "stumbler" for Reddit.
 What it is
 
 A tiny Firefox WebExtension that opens a random subreddit
-
+https://addons.mozilla.org/en-US/firefox/addon/redstumblarr/
 <img width="380" height="271" alt="image" src="https://github.com/user-attachments/assets/e6f9358d-38cf-4757-b7e1-6f0e4745a639" />
 
 
